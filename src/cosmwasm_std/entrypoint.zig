@@ -34,24 +34,33 @@ const NakedActionFn = fn (env_offset: u32, info_offset: u32, msg_offset: u32) ca
 
 const ally = std.heap.page_allocator;
 
+fn to_json_region_offset(res: anytype, allocator: std.mem.Allocator) u32 {
+    const region = Region.to_json_region(res, allocator) catch unreachable;
+    return region.as_offset();
+}
+
 inline fn as_query_entrypoint(comptime m: type, comptime err: type, buf_size: comptime_int, comptime query_fn: QueryWithBufFn(m, err)) NakedQueryFn {
     return struct {
         fn wrapped(env_offset: u32, msg_offset: u32) callconv(.C) u32 {
             const env = Region
                 .from_offset(env_offset)
-                .json_deserialize(Env, ally) catch unreachable;
-
+                .json_deserialize(Env, ally) catch |e| {
+                return to_json_region_offset(ContractResult([]const u8).err(@errorName(e)), ally);
+            };
             const msg = Region
                 .from_offset(msg_offset)
-                .json_deserialize(m, ally) catch unreachable;
+                .json_deserialize(m, ally) catch |e| {
+                return to_json_region_offset(ContractResult([]const u8).err(@errorName(e)), ally);
+            };
 
             var buf: [buf_size]u8 = undefined;
 
-            const res = query_fn(env, msg, &buf) catch unreachable;
+            const res = query_fn(env, msg, &buf) catch |e| {
+                return to_json_region_offset(ContractResult([]const u8).err(@errorName(e)), ally);
+            };
             defer res.deinit();
 
-            return (Region.to_json_region(ContractResult([]const u8).ok(res.items), ally) catch unreachable)
-                .as_offset();
+            return to_json_region_offset(ContractResult([]const u8).ok(res.items), ally);
         }
     }.wrapped;
 }
@@ -61,22 +70,29 @@ inline fn as_action_entrypoint(comptime m: type, comptime err: type, buf_size: c
         fn wrapped(env_offset: u32, info_offset: u32, msg_offset: u32) callconv(.C) u32 {
             const env = Region
                 .from_offset(env_offset)
-                .json_deserialize(Env, ally) catch unreachable;
+                .json_deserialize(Env, ally) catch |e| {
+                return to_json_region_offset(ContractResult([]const u8).err(@errorName(e)), ally);
+            };
 
             const info = Region
                 .from_offset(info_offset)
-                .json_deserialize(MessageInfo, ally) catch unreachable;
+                .json_deserialize(MessageInfo, ally) catch |e| {
+                return to_json_region_offset(ContractResult([]const u8).err(@errorName(e)), ally);
+            };
 
             const msg = Region
                 .from_offset(msg_offset)
-                .json_deserialize(m, ally) catch unreachable;
+                .json_deserialize(m, ally) catch |e| {
+                return to_json_region_offset(ContractResult([]const u8).err(@errorName(e)), ally);
+            };
 
             var buf: [buf_size]u8 = undefined;
-            const res = write_fn(env, info, msg, &buf) catch unreachable;
+            const res = write_fn(env, info, msg, &buf) catch |e| {
+                return to_json_region_offset(ContractResult([]const u8).err(@errorName(e)), ally);
+            };
             defer res.deinit();
 
-            const region = Region.to_json_region(ContractResult(RawResponse).ok(res.build()), ally) catch unreachable;
-            return region.as_offset();
+            return to_json_region_offset(ContractResult(RawResponse).ok(res.build()), ally);
         }
     }.wrapped;
 }
