@@ -56,7 +56,7 @@ const CountResponse = struct {
 comptime {
     entrypoint(.{ .instantiate = instantiate });
 }
-fn instantiate(env: Env, info: MessageInfo, msg: InstantiateMsg) *Response {
+fn instantiate(env: Env, info: MessageInfo, msg: InstantiateMsg) !*Response {
     _ = env;
     _ = info;
 
@@ -76,7 +76,7 @@ comptime {
         .execute = .{ .function = execute, .with_buf_size = max_digits(u128) },
     });
 }
-fn execute(env: Env, info: MessageInfo, msg: ExecuteMsg, buf: []u8) *Response {
+fn execute(env: Env, info: MessageInfo, msg: ExecuteMsg, buf: []u8) !*Response {
     _ = env;
     _ = info;
 
@@ -113,7 +113,7 @@ fn execute(env: Env, info: MessageInfo, msg: ExecuteMsg, buf: []u8) *Response {
 comptime {
     entrypoint(.{ .query = query });
 }
-fn query(env: Env, msg: QueryMsg) Binary {
+fn query(env: Env, msg: QueryMsg) !Binary {
     _ = env;
     return switch (msg) {
         .count => block: {
@@ -127,6 +127,6 @@ fn query(env: Env, msg: QueryMsg) Binary {
 }
 
 // TODO:
-// - ResponseBuilder -> Response, Response -> RawResponse
 // - error handling
+//   - make errorset a type arguement (like msg does)
 // - make cw_std a module
