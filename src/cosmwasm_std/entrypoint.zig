@@ -4,6 +4,8 @@ const StructField = std.builtin.Type.StructField;
 const Region = @import("memory.zig").Region;
 const ContractResult = @import("result.zig").ContractResult;
 
+const Binary = @import("binary.zig").Binary;
+
 const RawResponse = @import("response.zig").RawResponse;
 const Response = @import("response.zig").Response;
 
@@ -15,10 +17,10 @@ const Coin = types.Coin;
 const api = @import("api.zig");
 
 fn QueryFn(comptime m: type) type {
-    return fn (env: Env, msg: m) []const u8;
+    return fn (env: Env, msg: m) Binary;
 }
 fn QueryWithBufFn(comptime m: type) type {
-    return fn (env: Env, msg: m, buf: []u8) []const u8;
+    return fn (env: Env, msg: m, buf: []u8) Binary;
 }
 const NakedQueryFn = fn (env_offset: u32, msg_offset: u32) callconv(.C) u32;
 
@@ -44,7 +46,11 @@ inline fn as_query_entrypoint(m: type, buf_size: comptime_int, comptime query_fn
                 .json_deserialize(m, ally) catch unreachable;
 
             var buf: [buf_size]u8 = undefined;
-            return (Region.to_json_region(ContractResult([]const u8).ok(query_fn(env, msg, &buf)), ally) catch unreachable)
+
+            const res = query_fn(env, msg, &buf);
+            defer res.deinit();
+
+            return (Region.to_json_region(ContractResult([]const u8).ok(res.items), ally) catch unreachable)
                 .as_offset();
         }
     }.wrapped;
@@ -103,7 +109,7 @@ inline fn construct_exports(ents: anytype, field: StructField, wrapper_fn: anyty
             const ent_function = switch (msg_param_index) {
                 // msg params: (env = [0], msg = [1])
                 1 => struct {
-                    fn _(env: Env, msg: msg_type, buf: []u8) []const u8 {
+                    fn _(env: Env, msg: msg_type, buf: []u8) Binary {
                         _ = buf;
                         return ent_function_without_buf(env, msg);
                     }

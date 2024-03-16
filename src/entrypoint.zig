@@ -2,6 +2,10 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const ally = std.heap.page_allocator;
 
+const binary = @import("cosmwasm_std/binary.zig");
+const Binary = binary.Binary;
+const to_json_binary = binary.to_json_binary;
+
 const serde = @import("cosmwasm_std/serde.zig");
 
 const memory = @import("cosmwasm_std/memory.zig");
@@ -109,7 +113,7 @@ fn execute(env: Env, info: MessageInfo, msg: ExecuteMsg, buf: []u8) *Response {
 comptime {
     entrypoint(.{ .query = query });
 }
-fn query(env: Env, msg: QueryMsg) []const u8 {
+fn query(env: Env, msg: QueryMsg) Binary {
     _ = env;
     return switch (msg) {
         .count => block: {
@@ -117,10 +121,7 @@ fn query(env: Env, msg: QueryMsg) []const u8 {
             defer count_reader.deinit();
             const count = count_reader.read(); // u128 as string
 
-            const res = CountResponse{ .count = count };
-            const data = serde.to_base64_json(res, ally) catch unreachable;
-
-            break :block data;
+            break :block to_json_binary(CountResponse{ .count = count }, ally) catch unreachable;
         },
     };
 }
