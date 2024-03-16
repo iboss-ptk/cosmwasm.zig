@@ -52,7 +52,7 @@ const CountResponse = struct {
 comptime {
     entrypoint(.{ .instantiate = instantiate });
 }
-fn instantiate(env: Env, info: MessageInfo, msg: InstantiateMsg) Response {
+fn instantiate(env: Env, info: MessageInfo, msg: InstantiateMsg) *Response {
     _ = env;
     _ = info;
 
@@ -64,7 +64,7 @@ fn instantiate(env: Env, info: MessageInfo, msg: InstantiateMsg) Response {
     // construct response
     return res
         .add_attribute("action", "instantiate")
-        .add_attribute("count", msg.count).*;
+        .add_attribute("count", msg.count);
 }
 
 comptime {
@@ -72,7 +72,7 @@ comptime {
         .execute = .{ .function = execute, .with_buf_size = max_digits(u128) },
     });
 }
-fn execute(env: Env, info: MessageInfo, msg: ExecuteMsg, buf: []u8) Response {
+fn execute(env: Env, info: MessageInfo, msg: ExecuteMsg, buf: []u8) *Response {
     _ = env;
     _ = info;
 
@@ -91,7 +91,7 @@ fn execute(env: Env, info: MessageInfo, msg: ExecuteMsg, buf: []u8) Response {
 
             break :block res
                 .add_attribute("action", "increase")
-                .add_attribute("count", new_count).*;
+                .add_attribute("count", new_count);
         },
         .decrease => |payload| block: {
             const amount = std.fmt.parseInt(u128, payload.amount, 10) catch unreachable;
@@ -101,7 +101,7 @@ fn execute(env: Env, info: MessageInfo, msg: ExecuteMsg, buf: []u8) Response {
 
             break :block res
                 .add_attribute("action", "decrease")
-                .add_attribute("count", new_count).*;
+                .add_attribute("count", new_count);
         },
     };
 }

@@ -23,10 +23,10 @@ fn QueryWithBufFn(comptime m: type) type {
 const NakedQueryFn = fn (env_offset: u32, msg_offset: u32) callconv(.C) u32;
 
 fn ActionFn(comptime m: type) type {
-    return fn (env: Env, info: MessageInfo, msg: m) Response;
+    return fn (env: Env, info: MessageInfo, msg: m) *Response;
 }
 fn ActionWithBufFn(comptime m: type) type {
-    return fn (env: Env, info: MessageInfo, msg: m, buf: []u8) Response;
+    return fn (env: Env, info: MessageInfo, msg: m, buf: []u8) *Response;
 }
 const NakedActionFn = fn (env_offset: u32, info_offset: u32, msg_offset: u32) callconv(.C) u32;
 
@@ -93,13 +93,13 @@ pub inline fn entrypoint(ents: anytype) void {
 
 inline fn construct_exports(ents: anytype, field: StructField, wrapper_fn: anytype, msg_param_index: comptime_int) void {
     const ent_conf = @field(ents, field.name);
+
     const ent_conf_type = @typeInfo(@TypeOf(ent_conf));
     const action_entrypoint = switch (ent_conf_type) {
         // set entrypoint function, no buffer passed in
         .Fn => |fn_info| block: {
             const ent_function_without_buf = ent_conf;
             const msg_type = fn_info.params[msg_param_index].type.?;
-
             const ent_function = switch (msg_param_index) {
                 // msg params: (env = [0], msg = [1])
                 1 => struct {
@@ -110,7 +110,7 @@ inline fn construct_exports(ents: anytype, field: StructField, wrapper_fn: anyty
                 },
                 // msg params: (env = [0], info = [1] msg = [2])
                 2 => struct {
-                    fn _(env: Env, info: MessageInfo, msg: msg_type, buf: []u8) Response {
+                    fn _(env: Env, info: MessageInfo, msg: msg_type, buf: []u8) *Response {
                         _ = buf;
                         return ent_function_without_buf(env, info, msg);
                     }
