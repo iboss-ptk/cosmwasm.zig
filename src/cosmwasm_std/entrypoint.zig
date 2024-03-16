@@ -92,7 +92,7 @@ inline fn as_action_entrypoint(comptime m: type, comptime err: type, buf_size: c
             };
             defer res.deinit();
 
-            return to_json_region_offset(ContractResult(RawResponse).ok(res.build()), ally);
+            return to_json_region_offset(ContractResult(RawResponse).ok(res.to_raw()), ally);
         }
     }.wrapped;
 }

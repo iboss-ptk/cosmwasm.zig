@@ -17,7 +17,7 @@ pub const Response = struct {
         return self;
     }
 
-    pub fn build(self: Response) RawResponse {
+    pub fn to_raw(self: Response) RawResponse {
         const attributes = self.atrributes.items;
         return RawResponse{
             .messages = &[_][]const u8{},
