@@ -23,8 +23,6 @@ const Env = types.Env;
 const MessageInfo = types.MessageInfo;
 
 const entrypoint = @import("cosmwasm_std/entrypoint.zig").entrypoint;
-const as_write_entrypoint = @import("cosmwasm_std/entrypoint.zig").as_action_entrypoint;
-
 const max_digits = @import("utils.zig").max_digits;
 
 /// Mark all exports from `cosmwasm_std/exports.zig` as exports from this module

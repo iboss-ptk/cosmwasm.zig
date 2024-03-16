@@ -1,4 +1,6 @@
 const std = @import("std");
+const StructField = std.builtin.Type.StructField;
+
 const Region = @import("memory.zig").Region;
 const ContractResult = @import("result.zig").ContractResult;
 
@@ -78,75 +80,57 @@ pub inline fn entrypoint(ents: anytype) void {
 
     inline for (fields) |field| {
         if (any_of(field.name, .{"query"})) {
-            const ent_conf = @field(ents, field.name);
-            const ent_conf_type = @typeInfo(@TypeOf(ent_conf));
-            const query_entrypoint = switch (ent_conf_type) {
-                // set entrypoint function, no buffer passed in
-                .Fn => |fn_info| block: {
-                    const ent_function_without_buf = ent_conf;
-
-                    // (env = [0], msg = [1])
-                    const query_msg_type = fn_info.params[1].type.?;
-
-                    const ent_function = struct {
-                        fn _(env: Env, msg: query_msg_type, buf: []u8) []const u8 {
-                            _ = buf;
-                            return ent_function_without_buf(env, msg);
-                        }
-                    }._;
-
-                    break :block as_query_entrypoint(query_msg_type, 0, ent_function);
-                },
-                .Struct => block: {
-                    const ent_function = @field(ent_conf, "function");
-                    const buf_size = @field(ent_conf, "with_buf_size");
-
-                    // (env = [0], msg = [1])
-                    const query_msg_type = @typeInfo(@TypeOf(ent_function)).Fn.params[1].type.?;
-
-                    break :block as_query_entrypoint(query_msg_type, buf_size, ent_function);
-                },
-                else => @compileError("Invalid entrypoint configuration: " ++ ent_conf_type.name),
-            };
-
-            @export(query_entrypoint, .{ .name = field.name, .linkage = .Strong });
+            // msg params: (env = [0], msg = [1])
+            construct_exports(ents, field, as_query_entrypoint, 1);
         } else if (any_of(field.name, .{ "instantiate", "execute" })) {
-            const ent_conf = @field(ents, field.name);
-            const ent_conf_type = @typeInfo(@TypeOf(ent_conf));
-            const action_entrypoint = switch (ent_conf_type) {
-                // set entrypoint function, no buffer passed in
-                .Fn => |fn_info| block: {
-                    const ent_function_without_buf = ent_conf;
-
-                    // (env = [0], info = [1], msg = [2])
-                    const action_msg_type = fn_info.params[2].type.?;
-
-                    const ent_function = struct {
-                        fn _(env: Env, info: MessageInfo, msg: action_msg_type, buf: []u8) ResponseBuilder {
-                            _ = buf;
-                            return ent_function_without_buf(env, info, msg);
-                        }
-                    }._;
-
-                    break :block as_action_entrypoint(action_msg_type, 0, ent_function);
-                },
-                .Struct => block: {
-                    const ent_function = @field(ent_conf, "function");
-                    const buf_size = @field(ent_conf, "with_buf_size");
-
-                    // (env = [0], info = [1], msg = [2])
-                    const action_msg_type = @typeInfo(@TypeOf(ent_function)).Fn.params[2].type.?;
-
-                    break :block as_action_entrypoint(action_msg_type, buf_size, ent_function);
-                },
-                else => @compileError("Invalid entrypoint configuration: " ++ ent_conf_type.name),
-            };
-
-            @export(action_entrypoint, .{ .name = field.name, .linkage = .Strong });
+            // msg params: (env = [0], info = [1] msg = [2])
+            construct_exports(ents, field, as_action_entrypoint, 2);
         } else {
             @compileError("Unknown entrypoint: " ++ field.name);
         }
     }
+}
+
+inline fn construct_exports(ents: anytype, field: StructField, wrapper_fn: anytype, msg_param_index: comptime_int) void {
+    const ent_conf = @field(ents, field.name);
+    const ent_conf_type = @typeInfo(@TypeOf(ent_conf));
+    const action_entrypoint = switch (ent_conf_type) {
+        // set entrypoint function, no buffer passed in
+        .Fn => |fn_info| block: {
+            const ent_function_without_buf = ent_conf;
+            const msg_type = fn_info.params[msg_param_index].type.?;
+
+            const ent_function = switch (msg_param_index) {
+                // msg params: (env = [0], msg = [1])
+                1 => struct {
+                    fn _(env: Env, msg: msg_type, buf: []u8) []const u8 {
+                        _ = buf;
+                        return ent_function_without_buf(env, msg);
+                    }
+                },
+                // msg params: (env = [0], info = [1] msg = [2])
+                2 => struct {
+                    fn _(env: Env, info: MessageInfo, msg: msg_type, buf: []u8) ResponseBuilder {
+                        _ = buf;
+                        return ent_function_without_buf(env, info, msg);
+                    }
+                },
+                else => @compileError("Invalid message parameter index: " ++ msg_param_index.toString()),
+            }._;
+
+            break :block wrapper_fn(msg_type, 0, ent_function);
+        },
+        .Struct => block: {
+            const ent_function = @field(ent_conf, "function");
+            const buf_size = @field(ent_conf, "with_buf_size");
+
+            const msg_type = @typeInfo(@TypeOf(ent_function)).Fn.params[msg_param_index].type.?;
+            break :block wrapper_fn(msg_type, buf_size, ent_function);
+        },
+        else => @compileError("Invalid entrypoint configuration: " ++ ent_conf_type.name),
+    };
+
+    @export(action_entrypoint, .{ .name = field.name, .linkage = .Strong });
 }
 
 inline fn any_of(v: []const u8, args: anytype) bool {
