@@ -9,7 +9,6 @@ const Region = memory.Region;
 
 const response = @import("cosmwasm_std/response.zig");
 const Response = response.Response;
-const ResponseBuilder = response.ResponseBuilder;
 const Attribute = response.Attribute;
 
 const result = @import("cosmwasm_std/result.zig");
@@ -53,11 +52,11 @@ const CountResponse = struct {
 comptime {
     entrypoint(.{ .instantiate = instantiate });
 }
-fn instantiate(env: Env, info: MessageInfo, msg: InstantiateMsg) ResponseBuilder {
+fn instantiate(env: Env, info: MessageInfo, msg: InstantiateMsg) Response {
     _ = env;
     _ = info;
 
-    var res = ResponseBuilder.init(ally);
+    var res = Response.init(ally);
 
     // write count to store
     store.write("count", msg.count, ally);
@@ -73,7 +72,7 @@ comptime {
         .execute = .{ .function = execute, .with_buf_size = max_digits(u128) },
     });
 }
-fn execute(env: Env, info: MessageInfo, msg: ExecuteMsg, buf: []u8) ResponseBuilder {
+fn execute(env: Env, info: MessageInfo, msg: ExecuteMsg, buf: []u8) Response {
     _ = env;
     _ = info;
 
@@ -81,7 +80,7 @@ fn execute(env: Env, info: MessageInfo, msg: ExecuteMsg, buf: []u8) ResponseBuil
     defer count_reader.deinit();
     const count = std.fmt.parseInt(u128, count_reader.read(), 10) catch unreachable;
 
-    var res = ResponseBuilder.init(ally);
+    var res = Response.init(ally);
 
     return switch (msg) {
         .increase => |payload| block: {
@@ -127,6 +126,6 @@ fn query(env: Env, msg: QueryMsg) []const u8 {
 }
 
 // TODO:
-// - generalize query
+// - ResponseBuilder -> Response, Response -> RawResponse
 // - error handling
 // - make cw_std a module

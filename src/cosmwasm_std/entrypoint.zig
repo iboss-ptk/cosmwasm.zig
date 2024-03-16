@@ -4,8 +4,8 @@ const StructField = std.builtin.Type.StructField;
 const Region = @import("memory.zig").Region;
 const ContractResult = @import("result.zig").ContractResult;
 
+const RawResponse = @import("response.zig").RawResponse;
 const Response = @import("response.zig").Response;
-const ResponseBuilder = @import("response.zig").ResponseBuilder;
 
 const types = @import("types.zig");
 const Env = types.Env;
@@ -23,10 +23,10 @@ fn QueryWithBufFn(comptime m: type) type {
 const NakedQueryFn = fn (env_offset: u32, msg_offset: u32) callconv(.C) u32;
 
 fn ActionFn(comptime m: type) type {
-    return fn (env: Env, info: MessageInfo, msg: m) ResponseBuilder;
+    return fn (env: Env, info: MessageInfo, msg: m) Response;
 }
 fn ActionWithBufFn(comptime m: type) type {
-    return fn (env: Env, info: MessageInfo, msg: m, buf: []u8) ResponseBuilder;
+    return fn (env: Env, info: MessageInfo, msg: m, buf: []u8) Response;
 }
 const NakedActionFn = fn (env_offset: u32, info_offset: u32, msg_offset: u32) callconv(.C) u32;
 
@@ -69,7 +69,7 @@ inline fn as_action_entrypoint(m: type, buf_size: comptime_int, comptime write_f
             const res = write_fn(env, info, msg, &buf);
             defer res.deinit();
 
-            const region = Region.to_json_region(ContractResult(Response).ok(res.build()), ally) catch unreachable;
+            const region = Region.to_json_region(ContractResult(RawResponse).ok(res.build()), ally) catch unreachable;
             return region.as_offset();
         }
     }.wrapped;
@@ -110,7 +110,7 @@ inline fn construct_exports(ents: anytype, field: StructField, wrapper_fn: anyty
                 },
                 // msg params: (env = [0], info = [1] msg = [2])
                 2 => struct {
-                    fn _(env: Env, info: MessageInfo, msg: msg_type, buf: []u8) ResponseBuilder {
+                    fn _(env: Env, info: MessageInfo, msg: msg_type, buf: []u8) Response {
                         _ = buf;
                         return ent_function_without_buf(env, info, msg);
                     }
